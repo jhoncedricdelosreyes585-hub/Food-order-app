@@ -10,7 +10,9 @@ const PORT = process.env.PORT || 3000;
 // ── MIDDLEWARE ────────────────────────────────────────────────
 // cors() allows your Vercel frontend to talk to this Render backend.
 // Without it, the browser would block the request for security reasons.
-app.use(cors());
+app.use(cors({
+    origin: 'https://garden-bistro-frontend.vercel.app'
+  }));
 
 // express.json() lets us read the JSON body that the frontend sends.
 app.use(express.json());
