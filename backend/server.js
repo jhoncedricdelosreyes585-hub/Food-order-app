@@ -21,12 +21,15 @@ app.use(express.json());
 // This sets up the connection to Gmail's SMTP server.
 // The credentials are read from environment variables (the .env file).
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_APP_PASSWORD, // This is an App Password, NOT your login password
-  },
-});
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true,
+    auth: {
+      user: process.env.GMAIL_USER,
+      pass: process.env.GMAIL_APP_PASSWORD,
+    },
+    connectionTimeout: 20000, // wait up to 20 seconds before giving up
+  });
 
 // ── HEALTH CHECK ROUTE ────────────────────────────────────────
 // A simple route you can visit in the browser to confirm the server is running.
