@@ -4,89 +4,92 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>The Garden Bistro — Order Online</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
-  <!-- TOP NAV -->
   <header class="topbar">
     <div class="topbar-inner">
       <div class="brand">
-        <span class="brand-icon">🌿</span>
+        <span class="brand-mark">GB</span>
         <span class="brand-name">The Garden Bistro</span>
       </div>
       <button class="cart-pill" onclick="scrollToCart()">
-        🛒 <span id="nav-cart-count">0</span>
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+        <span id="nav-cart-count">0</span>
       </button>
     </div>
   </header>
 
-  <!-- HERO -->
   <section class="hero">
     <div class="hero-content">
-      <p class="hero-eyebrow">Open now · Delivers in 30-40 min</p>
-      <h1>Fresh food,<br>straight to your table</h1>
-      <p class="hero-sub">Order online and we'll get cooking right away.</p>
+      <p class="hero-eyebrow">Open today · Ready in 30–40 min</p>
+      <h1>Slow food,<br>served fast.</h1>
+      <p class="hero-sub">Everything on our menu is cooked the same morning you order it.</p>
+    </div>
+    <div class="hero-leaf" aria-hidden="true">
+      <svg viewBox="0 0 200 200" width="100%" height="100%">
+        <path d="M100 20 C140 20 175 55 175 100 C175 145 140 180 100 180 C100 130 100 70 100 20 Z" fill="currentColor" opacity="0.14"/>
+        <path d="M100 20 L100 180" stroke="currentColor" stroke-width="1.5" opacity="0.25"/>
+      </svg>
     </div>
   </section>
 
   <main>
-    <!-- CATEGORY PILLS -->
-    <section class="category-row" id="category-row">
-      <!-- Filled by JavaScript -->
-    </section>
+    <section class="category-row" id="category-row"></section>
 
-    <!-- CUSTOMER DETAILS -->
     <section class="card" id="customer-section">
-      <h2>Your Details</h2>
+      <h2>Your details</h2>
       <div class="form-grid">
         <div class="form-row">
-          <label for="customer-name">Your Name</label>
-          <input type="text" id="customer-name" placeholder="e.g. Maria Santos" />
+          <label for="customer-name">Your name</label>
+          <input type="text" id="customer-name" placeholder="Maria Santos" />
         </div>
         <div class="form-row">
-          <label for="customer-email">Your Email</label>
-          <input type="email" id="customer-email" placeholder="e.g. maria@gmail.com" />
+          <label for="customer-email">Your email</label>
+          <input type="email" id="customer-email" placeholder="maria@gmail.com" />
         </div>
       </div>
       <div class="form-row">
-        <label for="customer-note">Special Instructions (optional)</label>
-        <textarea id="customer-note" rows="2" placeholder="e.g. No onions, allergic to nuts"></textarea>
+        <label for="customer-note">Special instructions <span class="optional">(optional)</span></label>
+        <textarea id="customer-note" rows="2" placeholder="No onions, allergic to nuts…"></textarea>
       </div>
     </section>
 
-    <!-- MENU -->
     <section id="menu-section">
       <div class="section-heading">
-        <h2>Our Menu</h2>
-        <span class="section-sub">Made fresh daily</span>
+        <h2>Today's menu</h2>
+        <span class="section-sub">Made fresh this morning</span>
       </div>
-      <div class="menu-grid" id="menu-grid">
-        <!-- Filled by JavaScript -->
-      </div>
+      <div class="menu-grid" id="menu-grid"></div>
     </section>
   </main>
 
-  <!-- STICKY CART (becomes a bottom bar on mobile, sidebar on desktop) -->
   <section class="cart-panel" id="cart-section">
     <div class="cart-panel-inner">
-      <h2>🛒 Your Order</h2>
+      <div class="cart-header">
+        <h2>Your order</h2>
+        <span class="cart-header-count" id="cart-header-count"></span>
+      </div>
       <div id="cart-items">
-        <p class="empty-msg">Your cart is empty. Add items from the menu!</p>
+        <p class="empty-msg">Your cart is empty. Tap a dish to add it.</p>
       </div>
       <div id="cart-total-row" class="cart-total-row hidden">
         <span>Total</span>
         <span id="cart-total">₱0.00</span>
       </div>
       <button id="place-order-btn" class="btn-primary hidden" onclick="placeOrder()">
-        Place Order
+        <span class="btn-label">Place order</span>
       </button>
       <p id="order-status" class="status-msg hidden"></p>
     </div>
   </section>
 
   <footer>
-    <p>© 2025 The Garden Bistro. Powered by fresh ingredients and good vibes.</p>
+    <p>© 2025 The Garden Bistro. Cooked with care, every single day.</p>
   </footer>
 
   <script src="app.js"></script>
