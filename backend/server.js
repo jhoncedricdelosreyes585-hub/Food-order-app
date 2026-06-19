@@ -1,8 +1,7 @@
-const dns = require('dns');
-dns.setDefaultResultOrder('ipv4first');
+
 // ── IMPORTS ───────────────────────────────────────────────────
 const express    = require('express');
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 const cors       = require('cors');
 require('dotenv').config(); // Loads variables from the .env file
 
@@ -22,16 +21,7 @@ app.use(express.json());
 // ── EMAIL TRANSPORTER ─────────────────────────────────────────
 // This sets up the connection to Gmail's SMTP server.
 // The credentials are read from environment variables (the .env file).
-const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 465,
-    secure: true,
-    auth: {
-      user: process.env.GMAIL_USER,
-      pass: process.env.GMAIL_APP_PASSWORD,
-    },
-    connectionTimeout: 20000, // wait up to 20 seconds before giving up
-  });
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 // ── HEALTH CHECK ROUTE ────────────────────────────────────────
 // A simple route you can visit in the browser to confirm the server is running.
@@ -123,12 +113,12 @@ app.post('/order', async (req, res) => {
 
   // ── SEND THE EMAIL ────────────────────────────────────────
   try {
-    await transporter.sendMail({
-      from:    `"Garden Bistro Orders" <${process.env.GMAIL_USER}>`,
-      to:      process.env.OWNER_EMAIL, // The restaurant owner's email
-      subject: `🛒 New Order from ${customerName} — ₱${total.toFixed(2)}`,
-      html:    emailHtml,
-    });
+    await resend.emails.send({
+        from:    'Garden Bistro Orders <onboarding@resend.dev>',
+        to:      process.env.OWNER_EMAIL,
+        subject: `🛒 New Order from ${customerName} — ₱${total.toFixed(2)}`,
+        html:    emailHtml,
+      });
 
     console.log(`✅ Order email sent for ${customerName} at ${orderTime}`);
 
