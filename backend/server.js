@@ -1,3 +1,5 @@
+const dns = require('dns');
+dns.setDefaultResultOrder('ipv4first');
 // ── IMPORTS ───────────────────────────────────────────────────
 const express    = require('express');
 const nodemailer = require('nodemailer');
