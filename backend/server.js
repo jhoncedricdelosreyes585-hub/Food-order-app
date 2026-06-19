@@ -47,13 +47,19 @@ app.post('/order', orderLimiter, async (req, res) => {
     return res.status(403).json({ success: false, message: 'Forbidden.' });
   }
 
-  const { customerName, specialNote, items, total, orderTime } = req.body;
+  const { customerName, customerEmail, specialNote, items, total, orderTime } = req.body;
 
   // Basic validation — make sure the required data was actually sent
-  if (!customerName || !items || items.length === 0) {
+  if (!customerName || !customerEmail || !items || items.length === 0) {
     return res.status(400).json({
       success: false,
-      message: 'Invalid order: missing customer name or items.',
+      message: 'Invalid order: missing customer name, email, or items.',
+    });
+  }
+  if (!validator.isEmail(customerEmail)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid email address.',
     });
   }
   if (customerName.length > 100 || (specialNote && specialNote.length > 500)) {
@@ -66,70 +72,119 @@ app.post('/order', orderLimiter, async (req, res) => {
   // Sanitize all customer-provided text before it goes into the email
   const customerNameSafe = validator.escape(customerName);
   const specialNoteSafe  = validator.escape(specialNote || 'None');
+// ── BUILD THE OWNER NOTIFICATION EMAIL ────────────────────
+const itemRows = items
+.map(item => {
+  const nameSafe = validator.escape(item.name);
+  return `
+  <tr>
+    <td style="padding:10px 12px;border-bottom:1px solid #f0f0e8;">${nameSafe}</td>
+    <td style="padding:10px 12px;border-bottom:1px solid #f0f0e8;text-align:center;">${item.quantity}</td>
+    <td style="padding:10px 12px;border-bottom:1px solid #f0f0e8;text-align:right;">₱${item.unitPrice.toFixed(2)}</td>
+    <td style="padding:10px 12px;border-bottom:1px solid #f0f0e8;text-align:right;font-weight:600;">₱${item.subtotal.toFixed(2)}</td>
+  </tr>`;
+})
+.join('');
 
-  // ── BUILD THE EMAIL HTML ──────────────────────────────────
-  // This creates a nicely formatted HTML email for the restaurant owner.
-  const itemRows = items
-    .map(item => {
-      const nameSafe = validator.escape(item.name);
-      return `
-      <tr>
-        <td style="padding:10px 12px;border-bottom:1px solid #f0f0e8;">${nameSafe}</td>
-        <td style="padding:10px 12px;border-bottom:1px solid #f0f0e8;text-align:center;">${item.quantity}</td>
-        <td style="padding:10px 12px;border-bottom:1px solid #f0f0e8;text-align:right;">₱${item.unitPrice.toFixed(2)}</td>
-        <td style="padding:10px 12px;border-bottom:1px solid #f0f0e8;text-align:right;font-weight:600;">₱${item.subtotal.toFixed(2)}</td>
-      </tr>`;
-    })
-    .join('');
+const emailHtml = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"></head>
+<body style="font-family:'Segoe UI',system-ui,sans-serif;background:#f5f5f0;padding:20px;color:#1a1a1a;">
+  <div style="max-width:560px;margin:0 auto;background:white;border-radius:12px;overflow:hidden;border:1px solid #e0e0da;">
 
-  const emailHtml = `
+    <!-- Header -->
+    <div style="background:#2d6a4f;color:white;padding:24px 28px;">
+      <h1 style="margin:0;font-size:1.4rem;">🌿 New Order Received!</h1>
+      <p style="margin:6px 0 0;opacity:0.85;font-size:0.9rem;">The Garden Bistro</p>
+    </div>
+
+    <!-- Customer Info -->
+    <div style="padding:20px 28px;background:#f9faf8;border-bottom:1px solid #e0e0da;">
+      <h2 style="margin:0 0 12px;font-size:1rem;color:#555;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">Customer Details</h2>
+      <p style="margin:4px 0;"><strong>Name:</strong> ${customerNameSafe}</p>
+      <p style="margin:4px 0;"><strong>Email:</strong> ${customerEmail}</p>
+      <p style="margin:4px 0;"><strong>Order Time:</strong> ${orderTime}</p>
+      <p style="margin:4px 0;"><strong>Special Instructions:</strong> ${specialNoteSafe}</p>
+    </div>
+
+    <!-- Order Table -->
+    <div style="padding:20px 28px;">
+      <h2 style="margin:0 0 12px;font-size:1rem;color:#555;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">Order Items</h2>
+      <table style="width:100%;border-collapse:collapse;font-size:0.95rem;">
+        <thead>
+          <tr style="background:#f5f5f0;">
+            <th style="padding:10px 12px;text-align:left;font-weight:600;">Item</th>
+            <th style="padding:10px 12px;text-align:center;font-weight:600;">Qty</th>
+            <th style="padding:10px 12px;text-align:right;font-weight:600;">Unit Price</th>
+            <th style="padding:10px 12px;text-align:right;font-weight:600;">Subtotal</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${itemRows}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="3" style="padding:14px 12px;font-size:1.1rem;font-weight:700;text-align:right;">Total</td>
+            <td style="padding:14px 12px;font-size:1.1rem;font-weight:700;text-align:right;color:#2d6a4f;">₱${total.toFixed(2)}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <!-- Footer -->
+    <div style="padding:16px 28px;background:#f9faf8;border-top:1px solid #e0e0da;font-size:0.82rem;color:#999;text-align:center;">
+      This email was sent automatically by the Garden Bistro ordering system.
+    </div>
+  </div>
+</body>
+</html>
+`;
+  // ── CONFIRMATION EMAIL FOR THE CUSTOMER ───────────────────
+  const confirmationHtml = `
     <!DOCTYPE html>
     <html>
     <head><meta charset="UTF-8"></head>
     <body style="font-family:'Segoe UI',system-ui,sans-serif;background:#f5f5f0;padding:20px;color:#1a1a1a;">
       <div style="max-width:560px;margin:0 auto;background:white;border-radius:12px;overflow:hidden;border:1px solid #e0e0da;">
 
-        <!-- Header -->
         <div style="background:#2d6a4f;color:white;padding:24px 28px;">
-          <h1 style="margin:0;font-size:1.4rem;">🌿 New Order Received!</h1>
+          <h1 style="margin:0;font-size:1.4rem;">🌿 Order Confirmed!</h1>
           <p style="margin:6px 0 0;opacity:0.85;font-size:0.9rem;">The Garden Bistro</p>
         </div>
 
-        <!-- Customer Info -->
-        <div style="padding:20px 28px;background:#f9faf8;border-bottom:1px solid #e0e0da;">
-          <h2 style="margin:0 0 12px;font-size:1rem;color:#555;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">Customer Details</h2>
-          <p style="margin:4px 0;"><strong>Name:</strong> ${customerNameSafe}</p>
-          <p style="margin:4px 0;"><strong>Order Time:</strong> ${orderTime}</p>
-          <p style="margin:4px 0;"><strong>Special Instructions:</strong> ${specialNoteSafe}</p>
-        </div>
-
-        <!-- Order Table -->
         <div style="padding:20px 28px;">
-          <h2 style="margin:0 0 12px;font-size:1rem;color:#555;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">Order Items</h2>
+          <p style="margin:0 0 16px;">Hi ${customerNameSafe}, thank you for your order! We've received it and the kitchen has been notified.</p>
+
           <table style="width:100%;border-collapse:collapse;font-size:0.95rem;">
             <thead>
               <tr style="background:#f5f5f0;">
                 <th style="padding:10px 12px;text-align:left;font-weight:600;">Item</th>
                 <th style="padding:10px 12px;text-align:center;font-weight:600;">Qty</th>
-                <th style="padding:10px 12px;text-align:right;font-weight:600;">Unit Price</th>
                 <th style="padding:10px 12px;text-align:right;font-weight:600;">Subtotal</th>
               </tr>
             </thead>
             <tbody>
-              ${itemRows}
+              ${items.map(item => `
+                <tr>
+                  <td style="padding:10px 12px;border-bottom:1px solid #f0f0e8;">${validator.escape(item.name)}</td>
+                  <td style="padding:10px 12px;border-bottom:1px solid #f0f0e8;text-align:center;">${item.quantity}</td>
+                  <td style="padding:10px 12px;border-bottom:1px solid #f0f0e8;text-align:right;">₱${item.subtotal.toFixed(2)}</td>
+                </tr>`).join('')}
             </tbody>
             <tfoot>
               <tr>
-                <td colspan="3" style="padding:14px 12px;font-size:1.1rem;font-weight:700;text-align:right;">Total</td>
+                <td colspan="2" style="padding:14px 12px;font-size:1.1rem;font-weight:700;text-align:right;">Total</td>
                 <td style="padding:14px 12px;font-size:1.1rem;font-weight:700;text-align:right;color:#2d6a4f;">₱${total.toFixed(2)}</td>
               </tr>
             </tfoot>
           </table>
+
+          <p style="margin:20px 0 0;font-size:0.9rem;color:#555;">Order time: ${orderTime}</p>
         </div>
 
-        <!-- Footer -->
         <div style="padding:16px 28px;background:#f9faf8;border-top:1px solid #e0e0da;font-size:0.82rem;color:#999;text-align:center;">
-          This email was sent automatically by the Garden Bistro ordering system.
+          Questions about your order? Just reply to this email.
         </div>
       </div>
     </body>
@@ -138,6 +193,7 @@ app.post('/order', orderLimiter, async (req, res) => {
 
   // ── SEND THE EMAIL ────────────────────────────────────────
   try {
+    // Email to the restaurant owner
     await resend.emails.send({
       from:    'Garden Bistro Orders <onboarding@resend.dev>',
       to:      process.env.OWNER_EMAIL,
@@ -145,7 +201,15 @@ app.post('/order', orderLimiter, async (req, res) => {
       html:    emailHtml,
     });
 
-    console.log(`✅ Order email sent for ${customerNameSafe} at ${orderTime}`);
+    // Confirmation email to the customer
+    await resend.emails.send({
+      from:    'Garden Bistro <onboarding@resend.dev>',
+      to:      customerEmail,
+      subject: `✅ Your order from The Garden Bistro is confirmed!`,
+      html:    confirmationHtml,
+    });
+
+    console.log(`✅ Order email + confirmation sent for ${customerNameSafe} at ${orderTime}`);
 
     return res.status(200).json({
       success: true,

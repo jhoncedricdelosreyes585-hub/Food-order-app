@@ -150,6 +150,14 @@ async function placeOrder() {
     document.getElementById('customer-name').focus();
     return;
   }
+  const email = document.getElementById('customer-email').value.trim();
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  if (!email || !emailPattern.test(email)) {
+    alert('Please enter a valid email address before placing an order.');
+    document.getElementById('customer-email').focus();
+    return;
+  }
   if (cartItems.length === 0) {
     alert('Your cart is empty!');
     return;
@@ -158,6 +166,7 @@ async function placeOrder() {
   // Build the order object to send to the backend
   const orderData = {
     customerName: name,
+    customerEmail: email,
     specialNote: note || 'None',
     items: cartItems.map(item => ({
       name: item.name,
@@ -186,7 +195,6 @@ async function placeOrder() {
       });
 
     const result = await response.json();
-
     if (response.ok) {
       // Success! Clear the cart and show a success message.
       cart = {};
@@ -195,6 +203,7 @@ async function placeOrder() {
       statusEl.className = 'status-msg success';
       statusEl.classList.remove('hidden');
       document.getElementById('customer-name').value = '';
+      document.getElementById('customer-email').value = '';
       document.getElementById('customer-note').value = '';
     } else {
       throw new Error(result.message || 'Server returned an error.');
