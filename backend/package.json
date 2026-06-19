@@ -15,7 +15,9 @@
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.5.2",
     "nodemailer": "^9.0.1",
-    "resend": "^6.14.0"
+    "resend": "^6.14.0",
+    "validator": "^13.15.35"
   }
 }

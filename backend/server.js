@@ -1,8 +1,9 @@
-
 // ── IMPORTS ───────────────────────────────────────────────────
 const express    = require('express');
 const { Resend } = require('resend');
 const cors       = require('cors');
+const rateLimit  = require('express-rate-limit');
+const validator  = require('validator');
 require('dotenv').config(); // Loads variables from the .env file
 
 const app  = express();
@@ -12,15 +13,13 @@ const PORT = process.env.PORT || 3000;
 // cors() allows your Vercel frontend to talk to this Render backend.
 // Without it, the browser would block the request for security reasons.
 app.use(cors({
-    origin: 'https://garden-bistro-frontend.vercel.app'
-  }));
+  origin: 'https://garden-bistro-frontend.vercel.app'
+}));
 
 // express.json() lets us read the JSON body that the frontend sends.
 app.use(express.json());
 
-// ── EMAIL TRANSPORTER ─────────────────────────────────────────
-// This sets up the connection to Gmail's SMTP server.
-// The credentials are read from environment variables (the .env file).
+// ── EMAIL CLIENT ──────────────────────────────────────────────
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 // ── HEALTH CHECK ROUTE ────────────────────────────────────────
@@ -29,10 +28,25 @@ app.get('/', (req, res) => {
   res.json({ status: 'Garden Bistro order server is running! 🌿' });
 });
 
+// ── RATE LIMITER ──────────────────────────────────────────────
+// Blocks any single visitor from placing more than 10 orders in 15 minutes.
+const orderLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10,
+  message: { success: false, message: 'Too many orders. Please try again later.' },
+});
+
 // ── ORDER ROUTE ───────────────────────────────────────────────
 // This is the main route. The frontend sends a POST request here
 // with the order details as JSON in the request body.
-app.post('/order', async (req, res) => {
+app.post('/order', orderLimiter, async (req, res) => {
+
+  // ── SECRET KEY CHECK ─────────────────────────────────────
+  // Blocks any request that doesn't come from our own frontend.
+  if (req.headers['x-api-key'] !== process.env.FRONTEND_SECRET) {
+    return res.status(403).json({ success: false, message: 'Forbidden.' });
+  }
+
   const { customerName, specialNote, items, total, orderTime } = req.body;
 
   // Basic validation — make sure the required data was actually sent
@@ -42,19 +56,30 @@ app.post('/order', async (req, res) => {
       message: 'Invalid order: missing customer name or items.',
     });
   }
+  if (customerName.length > 100 || (specialNote && specialNote.length > 500)) {
+    return res.status(400).json({ success: false, message: 'Input too long.' });
+  }
+  if (items.length > 30) {
+    return res.status(400).json({ success: false, message: 'Too many items in one order.' });
+  }
+
+  // Sanitize all customer-provided text before it goes into the email
+  const customerNameSafe = validator.escape(customerName);
+  const specialNoteSafe  = validator.escape(specialNote || 'None');
 
   // ── BUILD THE EMAIL HTML ──────────────────────────────────
   // This creates a nicely formatted HTML email for the restaurant owner.
   const itemRows = items
-    .map(
-      item => `
+    .map(item => {
+      const nameSafe = validator.escape(item.name);
+      return `
       <tr>
-        <td style="padding:10px 12px;border-bottom:1px solid #f0f0e8;">${item.name}</td>
+        <td style="padding:10px 12px;border-bottom:1px solid #f0f0e8;">${nameSafe}</td>
         <td style="padding:10px 12px;border-bottom:1px solid #f0f0e8;text-align:center;">${item.quantity}</td>
         <td style="padding:10px 12px;border-bottom:1px solid #f0f0e8;text-align:right;">₱${item.unitPrice.toFixed(2)}</td>
         <td style="padding:10px 12px;border-bottom:1px solid #f0f0e8;text-align:right;font-weight:600;">₱${item.subtotal.toFixed(2)}</td>
-      </tr>`
-    )
+      </tr>`;
+    })
     .join('');
 
   const emailHtml = `
@@ -63,7 +88,7 @@ app.post('/order', async (req, res) => {
     <head><meta charset="UTF-8"></head>
     <body style="font-family:'Segoe UI',system-ui,sans-serif;background:#f5f5f0;padding:20px;color:#1a1a1a;">
       <div style="max-width:560px;margin:0 auto;background:white;border-radius:12px;overflow:hidden;border:1px solid #e0e0da;">
-        
+
         <!-- Header -->
         <div style="background:#2d6a4f;color:white;padding:24px 28px;">
           <h1 style="margin:0;font-size:1.4rem;">🌿 New Order Received!</h1>
@@ -73,9 +98,9 @@ app.post('/order', async (req, res) => {
         <!-- Customer Info -->
         <div style="padding:20px 28px;background:#f9faf8;border-bottom:1px solid #e0e0da;">
           <h2 style="margin:0 0 12px;font-size:1rem;color:#555;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">Customer Details</h2>
-          <p style="margin:4px 0;"><strong>Name:</strong> ${customerName}</p>
+          <p style="margin:4px 0;"><strong>Name:</strong> ${customerNameSafe}</p>
           <p style="margin:4px 0;"><strong>Order Time:</strong> ${orderTime}</p>
-          <p style="margin:4px 0;"><strong>Special Instructions:</strong> ${specialNote}</p>
+          <p style="margin:4px 0;"><strong>Special Instructions:</strong> ${specialNoteSafe}</p>
         </div>
 
         <!-- Order Table -->
@@ -114,13 +139,13 @@ app.post('/order', async (req, res) => {
   // ── SEND THE EMAIL ────────────────────────────────────────
   try {
     await resend.emails.send({
-        from:    'Garden Bistro Orders <onboarding@resend.dev>',
-        to:      process.env.OWNER_EMAIL,
-        subject: `🛒 New Order from ${customerName} — ₱${total.toFixed(2)}`,
-        html:    emailHtml,
-      });
+      from:    'Garden Bistro Orders <onboarding@resend.dev>',
+      to:      process.env.OWNER_EMAIL,
+      subject: `🛒 New Order from ${customerNameSafe} — ₱${total.toFixed(2)}`,
+      html:    emailHtml,
+    });
 
-    console.log(`✅ Order email sent for ${customerName} at ${orderTime}`);
+    console.log(`✅ Order email sent for ${customerNameSafe} at ${orderTime}`);
 
     return res.status(200).json({
       success: true,

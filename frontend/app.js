@@ -177,10 +177,13 @@ async function placeOrder() {
   try {
     // Send the order to our backend server
     const response = await fetch(`${BACKEND_URL}/order`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(orderData),
-    });
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-Key': 'bistro-2026-x7k9',
+        },
+        body: JSON.stringify(orderData),
+      });
 
     const result = await response.json();
 
